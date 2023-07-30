@@ -23,7 +23,7 @@
 #include "utils.h"
 #include "menu.h"
 
-int current_resolution = 0;
+resolution_t current_resolution;
 int current_bitdepth = 0;
 int current_buffers = 0;
 int current_gamma = 0;
@@ -45,18 +45,15 @@ unsigned char *__screen_buffer = NULL;
 
 volatile int __frames;
 
-void vblCallback(void)
-{
+void vblCallback() {
     __frames++;
 }
 
-int GetFrameCount()
-{
+int GetFrameCount() {
 	return __frames;
 }
 
-void reset_video_vars()
-{
+void reset_video_vars() {
 	current_resolution = RESOLUTION_320x240;
 	current_bitdepth = DEPTH_16_BPP;
 	current_buffers = 2;
@@ -68,8 +65,7 @@ void reset_video_vars()
 	useNTSC = 1;
 }
 
-void reset_video()
-{
+void reset_video() {
 	reset_video_vars();
 	set_video();
 	
@@ -78,18 +74,15 @@ void reset_video()
 	ChangedResolution = 1;
 }
 
-void init_video()
-{
+void init_video() {
 	__screen_buffer = NULL;
 
 	reset_video_vars();
 	video_set = 0;
 }
 
-void set_video()
-{
-	if(video_set)
-	{
+void set_video() {
+	if (video_set) {
 		FreeScreenBuffer();
 		
 		rdp_close();
@@ -99,34 +92,17 @@ void set_video()
 	
 	video_set = 0;
 	
-	display_init_ex(useNTSC, current_resolution, current_bitdepth, current_buffers, current_gamma, current_antialias);
+	display_init(current_resolution, current_bitdepth, current_buffers, current_gamma, current_antialias);
 	register_VI_handler(vblCallback);
 	rdp_init();
 	
-	switch(current_resolution)
-	{
-		case RESOLUTION_320x240:
-			dW = 320;
-			dH = 240;
-			break;
-		case RESOLUTION_640x480:
-			dW = 640;
-			dH = 480;
-			break;
-		case RESOLUTION_256x240:
-			dW = 256;
-			dH = 240;
-			break;
-		case RESOLUTION_512x480:
-			dW = 512;
-			dH = 480;
-			break;
-	}
+	dW = current_resolution.width;
+	dH = current_resolution.height;
 	
-	if(current_bitdepth == DEPTH_16_BPP)
+	if (current_bitdepth == DEPTH_16_BPP)
 		bD = 2;
 		
-	if(current_bitdepth == DEPTH_32_BPP)
+	if (current_bitdepth == DEPTH_32_BPP)
 		bD = 4;
 		
 	video_set = 1;
@@ -137,148 +113,112 @@ void set_video()
 	CreateScreenBuffer();
 }
 
-void GetDisplay()
-{	
-	do
-	{	__dc = display_lock();}
-	while(!__dc);
+void GetDisplay() {	
+	do {
+		__dc = display_lock();
+	} while (!__dc);
 	
-#ifdef DEBUG_BENCHMARK
-	start_counter();
-#endif
+	#ifdef DEBUG_BENCHMARK
+		start_counter();
+	#endif
 	ClearScreen();
 }
 
-int isNTSC()
-{
+int isNTSC() {
 	int tv; 
 	
 	tv = *(int *) 0x80000300;
 	return tv;
 }
 
-void WaitVsync()
-{
+void WaitVsync() {
 	int nextframe;
-	
-#ifdef DEBUG_BENCHMARK
-	Draw_counter(10, 10, end_counter());
-#endif
+	#ifdef DEBUG_BENCHMARK
+		Draw_counter(10, 10, end_counter());
+	#endif
 	nextframe = __frames + 1;
 	display_show(__dc);
-	while (nextframe > __frames) ;
+	while (nextframe > __frames);
 }
 
-void GetVideoModeStr(char *res, int shortdesc)
-{
-	if(!shortdesc)
-	{
-		switch(current_resolution)
-		{
-			case RESOLUTION_320x240:
-				sprintf(res, "Video: 240p");				
-				break;		
-			case RESOLUTION_640x480:
-				sprintf(res, "Video: 480i (Scaling disabled)");
-				break;
-			case RESOLUTION_256x240:
-				sprintf(res, "Video: 256x240");
-				break;
-			case RESOLUTION_512x480:
-				sprintf(res, "Video: 512x480");
-				break;
+void GetVideoModeStr(char *res, int shortdesc) {
+	if (!shortdesc) {
+		if (dW == 320 && dH == 240) {
+			sprintf(res, "Video: 240p");	
+		} else if (dW == 640 && dH == 480) {
+			sprintf(res, "Video: 480i (Scaling disabled)");
+		} else if (dW == 256 && dH == 240) {
+			sprintf(res, "Video: 256x240");
+		} else if (dW == 512 && dH == 480) {
+			sprintf(res, "Video: 512x480");
 		}
-	}
-	else
-	{
-		switch(current_resolution)
-		{
-			case RESOLUTION_320x240:
-				sprintf(res, "[240p]");				
-				break;
-			case RESOLUTION_640x480:
-				sprintf(res, "[480i]");
-				break;
-			case RESOLUTION_256x240:
-				sprintf(res, "[256]");
-				break;
-			case RESOLUTION_512x480:
-				sprintf(res, "[512]");
-				break;
+	} else {
+		if (dW == 320 && dH == 240) {
+			sprintf(res, "[240p]");	
+		} else if (dW == 640 && dH == 480) {
+			sprintf(res, "[480i]");
+		} else if (dW == 256 && dH == 240) {
+			sprintf(res, "[256]");
+		} else if (dW == 512 && dH == 480) {
+			sprintf(res, "[512]");
 		}
-
 	}
 }
 
 
-void CreateScreenBuffer()
-{	
+void CreateScreenBuffer() {	
 	FreeScreenBuffer();
-		
-#ifdef USE_N64MEM		
-	__screen_buffer = n64_malloc(dW*dH*bD);
-#else
-	__screen_buffer = malloc(dW*dH*bD);
-#endif
-
-	if(__screen_buffer)
-#ifdef USE_N64MEM		
-		n64_memset(__screen_buffer, 0, dW*dH*bD);
-#else
-		memset(__screen_buffer, 0, dW*dH*bD);
-#endif
+	#ifdef USE_N64MEM		
+		__screen_buffer = n64_malloc(dW * dH * bD);
+	#else
+		__screen_buffer = malloc(dW * dH * bD);
+	#endif
+	if (__screen_buffer) {
+		#ifdef USE_N64MEM		
+				n64_memset(__screen_buffer, 0, dW * dH * bD);
+		#else
+				memset(__screen_buffer, 0, dW * dH * bD);
+		#endif
+	}
 }
 
-void FreeScreenBuffer()
-{
-	if(__screen_buffer)
-	{
-#ifdef USE_N64MEM	
-		n64_free(__screen_buffer);
-#else
-		free(__screen_buffer);
-#endif
+void FreeScreenBuffer() {
+	if(__screen_buffer) {
+		#ifdef USE_N64MEM	
+				n64_free(__screen_buffer);
+		#else
+				free(__screen_buffer);
+		#endif
 		__screen_buffer = NULL;
 	}
 }
 
 
-void CopyScreen()
-{	
-	if(!__screen_buffer || !__dc)
-		return;
-
-#ifdef USE_N64MEM
-    n64_memcpy(__screen_buffer, __safe_buffer[(__dc)-1], dW*dH*bD);
-#else
-	memcpy(__screen_buffer, __safe_buffer[(__dc)-1], dW*dH*bD);
-#endif
+void CopyScreen() {	
+	if (!__screen_buffer || !__dc) return;
+	#ifdef USE_N64MEM
+		n64_memcpy(__screen_buffer, __safe_buffer[(int) (__dc) - 1], dW*dH*bD);
+	#else
+		memcpy(__screen_buffer, __safe_buffer[(int) (__dc) - 1], dW*dH*bD);
+	#endif
 }
 
-void FillScreenFromBuffer()
-{
-	if(!__screen_buffer || !__dc)
-		return;
-
-#ifdef USE_N64MEM
-    n64_memcpy(__safe_buffer[(__dc)-1], __screen_buffer, dW*dH*bD);
-#else
-	memcpy(__safe_buffer[(__dc)-1], __screen_buffer, dW*dH*bD);
-#endif
+void FillScreenFromBuffer() {
+	if(!__screen_buffer || !__dc) return;
+	#ifdef USE_N64MEM
+		n64_memcpy(__safe_buffer[(int) (__dc) - 1], __screen_buffer, dW*dH*bD);
+	#else
+		memcpy(__safe_buffer[(int) (__dc)-1], __screen_buffer, dW*dH*bD);
+	#endif
 }
 
-void DarkenScreenBuffer(int amount)
-{
-	if(!__screen_buffer || !__dc)
-		return;
+void DarkenScreenBuffer(int amount) {
+	if(!__screen_buffer || !__dc) return;
 
-	if(bD == 2)
-	{
-		uint16_t *screen = (uint16_t *)__screen_buffer;
-		for(int y = 0; y < dH; y++)
-		{
-			for(int x = 0; x < dW; x++)
-			{
+	if(bD == 2) {
+		uint16_t *screen = (uint16_t *) __screen_buffer;
+		for (int y = 0; y < dH; y++) {
+			for (int x = 0; x < dW; x++) {
 				uint16_t cur_color = screen[x + (y * dW)];
 
 				/* Get current color */
@@ -293,10 +233,12 @@ void DarkenScreenBuffer(int amount)
 					cr -= amount;
 				else
 					cr = 0;
+
 				if(cg > amount)
 					cg -= amount;
 				else
 					cg = 0;
+
 				if(cb > amount)
 					cb -= amount;
 				else
@@ -307,13 +249,10 @@ void DarkenScreenBuffer(int amount)
 		}
 	}
 	
-	if(bD == 4)
-	{
-		uint32_t *screen = (uint32_t *)__screen_buffer;
-		for(int y = 0; y < dH; y++)
-		{
-			for(int x = 0; x < dW; x++)
-			{
+	if (bD == 4) {
+		uint32_t *screen = (uint32_t *) __screen_buffer;
+		for (int y = 0; y < dH; y++) {
+			for (int x = 0; x < dW; x++) {
 				uint32_t cur_color = screen[x + (y * dW)];
 
 				/* Get current color */
@@ -325,10 +264,12 @@ void DarkenScreenBuffer(int amount)
 					cr -= amount;
 				else
 					cr = 0;
+
 				if(cg > amount)
 					cg -= amount;
 				else
 					cg = 0;
+
 				if(cb > amount)
 					cb -= amount;
 				else

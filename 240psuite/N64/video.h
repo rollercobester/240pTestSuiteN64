@@ -1,6 +1,6 @@
 #include <libdragon.h>
 
-extern int current_resolution;
+extern resolution_t current_resolution;
 extern int current_bitdepth;
 extern int current_buffers;
 extern int current_gamma;
@@ -17,8 +17,8 @@ extern int EnableDivot;
 extern int EnableDither;
 extern int useNTSC;
 
-extern void *__safe_buffer[];
-extern unsigned char *__screen_buffer;
+extern void* __safe_buffer[];
+extern unsigned char* __screen_buffer;
 
 void GetDisplay();
 int isNTSC();
